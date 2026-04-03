@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eclipse City | SAMP Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Cairo:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #060810; --panel: #0d1120; --gold: #f0a500; --text: #c8d6f0; --red: #ff3b3b;
+    }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Cairo', sans-serif;
+      margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+    .container {
+      background: var(--panel); border: 1px solid #1e2a45; padding: 2rem;
+      border-radius: 15px; width: 100%; max-width: 400px; text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 { font-family: 'Orbitron'; color: var(--gold); margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1rem; text-align: right; }
+    label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
+    input {
+      width: 100%; padding: 12px; background: #060810; border: 1px solid #1e2a45;
+      color: white; border-radius: 8px; box-sizing: border-box;
+    }
+    .btn {
+      width: 100%; padding: 12px; background: var(--gold); border: none;
+      color: black; font-weight: bold; border-radius: 8px; cursor: pointer;
+      margin-top: 1rem; transition: 0.3s;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { color: var(--red); font-size: 0.85rem; margin-top: 10px; display: none; }
+    #dashboard { display: none; }
+    .welcome-msg { color: var(--gold); font-size: 1.2rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+
+  <div id="login-page" class="container">
+    <h1>ECLIPSE CITY</h1>
+    <p>سجل دخولك بحسابك في اللعبة</p>
+    
+    <div class="form-group">
+      <label>إسم المستخدم (RP Name)</label>
+      <input type="text" id="username" placeholder="Simo_Ecl...">
+    </div>
+    
+    <div class="form-group">
+      <label>كلمة السر</label>
+      <input type="password" id="password" placeholder="••••••••">
+    </div>
+
+    <div id="login-error" class="error">خطأ في الإسم أو كلمة السر</div>
+    <button class="btn" id="login-btn" onclick="handleLogin()">دخول الحساب</button>
+  </div>
+
+  <div id="dashboard" class="container">
+    <h1>DASHBOARD</h1>
+    <div class="welcome-msg">مرحباً، <span id="user-display"></span></div>
+    <div style="background: #060810; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+        <p>مستوى اللاعب: <span id="user-level">0</span></p>
+        <p>رصيد البنك: <span id="user-money">0</span>$</p>
+    </div>
+    <button class="btn" style="background: #333; color: white;" onclick="location.reload()">تسجيل الخروج</button>
+  </div>
+
+  <script>
+    async function handleLogin() {
+      const userVal = document.getElementById('username').value;
+      const passVal = document.getElementById('password').value;
+      const errorEl = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+
+      if (!userVal || !passVal) return;
+
+      // Disable button
+      btn.disabled = true;
+      btn.textContent = 'جاري التحقق...';
+      errorEl.style.display = 'none';
+
+      try {
+        // كنصيفطو المعلومات لـ API ديالنا في Vercel
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: userVal, password: passVal })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // إذا كانت المعلومات صحيحة
+          document.getElementById('login-page').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
+          document.getElementById('user-display').textContent = data.user.username;
+          document.getElementById('user-level').textContent = data.user.level || 0;
+          document.getElementById('user-money').textContent = data.user.bank || 0;
+        } else {
+          // إذا كان كاين خطأ
+          errorEl.textContent = data.message || 'خطأ في الدخول';
+          errorEl.style.display = 'block';
+        }
+      } catch (err) {
+        errorEl.textContent = 'مشكل في الاتصال بالسيرفر';
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'دخول الحساب';
+      }
+    }
+  </script>
+</body>
+</html>
