@@ -2,7 +2,7 @@
   "name": "eclipse-site",
   "version": "1.0.0",
   "dependencies": {
-    "mysql2": "^3.0.0",
-    "whirlpool-js": "^1.1.1"
+    "mysql2": "^3.9.0",
+    "crypto-js": "^4.2.0"
   }
 }
