@@ -1,6 +1,5 @@
 import mysql from 'mysql2/promise';
 
-// ── CONFIGURATION ──
 const REWARDS_LIST = {
     "//EC-A1F2-B3K9": { name: "سيارة Tahoma", id: 566 },
     "//EC-Z7X4-M2P8": { name: "مبلغ 50,000$", id: 50000 },
@@ -20,7 +19,7 @@ export default async function handler(req, res) {
     const { username, code } = req.body;
 
     if (!username || !code) {
-        return res.status(400).json({ success: false, message: 'Username awla Code naqas!' });
+        return res.status(400).json({ success: false, message: 'بيانات ناقصة!' });
     }
 
     const cleanCode = code.trim().toUpperCase();
@@ -34,9 +33,10 @@ export default async function handler(req, res) {
     try {
         connection = await mysql.createConnection(DB_CONFIG);
 
-        // 1. Check wach l-user kayn u jib "id" dialu (machi pID)
+        // 1. كنشوفو واش المستخدم موجود وشنو عندو في web_gift بالسمية (Username)
+        // هكا كنتفاداو المشكل ديال pID أو id
         const [userCheck] = await connection.execute(
-            'SELECT id, web_gift FROM users WHERE username = ?', 
+            'SELECT web_gift FROM users WHERE username = ?', 
             [username]
         );
         
@@ -44,10 +44,9 @@ export default async function handler(req, res) {
             return res.status(404).json({ success: false, message: 'المستخدم غير موجود!' });
         }
 
-        const playerID = userCheck[0].id; // Hna l-muhim: sta3mlna "id"
         const currentGift = parseInt(userCheck[0].web_gift || 0);
 
-        // 2. Check wach l-code m-sta3mel
+        // 2. واش الكود فايت مستعمل؟
         const [used] = await connection.execute(
             'SELECT id FROM used_codes WHERE code = ?', 
             [cleanCode]
@@ -56,18 +55,19 @@ export default async function handler(req, res) {
             return res.status(400).json({ success: false, message: 'هاد الكود تخدم من قبل!' });
         }
 
-        // 3. Check wach l-box 3amer
+        // 3. واش الصندوق عامر؟
         if (currentGift !== 0) {
             return res.status(400).json({ success: false, message: 'عندك هدية كتسناك فـ /box! خودها هي الأولى.' });
         }
 
-        // 4. Update l-box dial l-player
+        // 4. دابا كنديرو UPDATE باستعمال الـ username
+        // هادي هي أضمن طريقة باش ما يعطيكش Unknown Column
         await connection.execute(
-            'UPDATE users SET web_gift = ? WHERE id = ?', 
-            [reward.id, playerID]
+            'UPDATE users SET web_gift = ? WHERE username = ?', 
+            [reward.id, username]
         );
 
-        // 5. Sjel l-code ennu t-khdem
+        // 5. تسجيل الكود
         await connection.execute(
             'INSERT INTO used_codes (code, username) VALUES (?, ?)', 
             [cleanCode, username]
@@ -75,12 +75,12 @@ export default async function handler(req, res) {
 
         return res.status(200).json({ 
             success: true, 
-            message: `مبروك! حصلت على ${reward.name}. دخل للعبة واكتب /box.` 
+            message: `مبروك! حصلت على ${reward.name}. دخل للعبة ودير /box` 
         });
 
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ success: false, message: 'خطأ: ' + e.message });
+        return res.status(500).json({ success: false, message: 'خطأ في قاعدة البيانات: ' + e.message });
     } finally {
         if (connection) await connection.end();
     }
