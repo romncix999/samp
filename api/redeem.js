@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     try {
         connection = await mysql.createConnection(DB_CONFIG);
 
-        // 1. Qelleb 3la l-user b-smito u jib "uid" dialo
+        // 1. Jib l-UID u chouf wach l-user kayn
         const [userCheck] = await connection.execute(
             'SELECT uid, web_gift FROM users WHERE username = ?', 
             [username]
@@ -39,27 +39,26 @@ export default async function handler(req, res) {
         const playerUID = userCheck[0].uid;
         const currentGift = parseInt(userCheck[0].web_gift || 0);
 
-        // 2. [HAYYEDNA L-CHECK DIAL USED_CODES] 
-        // Bash t-qder t-tisti l-koud bzaf dial l-mrat
-
-        // 3. Check wach l-box 3amer (bach may-t-zadch koud foq koud)
+        // 2. Check wach l-box 3amer (bach may-t-zadch koud foq koud)
         if (currentGift !== 0) {
             return res.status(400).json({ success: false, message: 'عندك هدية كتسناك فـ /box! خودها هي الأولى.' });
         }
 
-        // 4. UPDATE l-database b-sta3mal "uid"
+        // 3. UPDATE l-database nichan
         await connection.execute(
             'UPDATE users SET web_gift = ? WHERE uid = ?', 
             [reward.id, playerUID]
         );
 
+        // Hna fin kan l-error: hayyedna l-INSERT dial used_codes bach may-bqach l-limit
         return res.status(200).json({ 
             success: true, 
             message: `مبروك! حصلت على ${reward.name}. دخل للعبة ودير /box` 
         });
 
     } catch (e) {
-        return res.status(500).json({ success: false, message: 'خطأ: ' + e.message });
+        // Ila waqe3 error, ghadi i-tla3 lik hna nichan
+        return res.status(500).json({ success: false, message: 'Error: ' + e.message });
     } finally {
         if (connection) await connection.end();
     }
