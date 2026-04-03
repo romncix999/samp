@@ -1,44 +1,93 @@
 import mysql from 'mysql2/promise';
 
-// Hna kat-7te l-codes u chnu l-hadiya dyalhom
-const REWARDS = {
-    "EC-A1F2-B3K9": { name: "سيارة Tahoma", id: 566, type: "vehicle" },
-    "EC-Z7X4-M2P8": { name: "مبلغ 50,000$", id: 50000, type: "money" },
-    "EC-Q5R1-N6T3": { name: "Level +1", id: 1, type: "level" }
+// ══════════════════════════════════════════════
+//  ECLIPSE CITY - REDEEM SYSTEM
+//  Hna kat-zid l-codes u chnu l-hadiya dialhom
+// ══════════════════════════════════════════════
+const REWARDS_LIST = {
+    "//EC-A1F2-B3K9": { name: "سيارة Tahoma", id: 566 }, // Model ID dial Tahoma
+    "//EC-Z7X4-M2P8": { name: "مبلغ 50,000$", id: 50000 },
+    "//EC-Q5R1-N6T3": { name: "Level +1", id: 1 },
+    "//EC-W8Y2-H4J7": { name: "سيارة Infernus", id: 411 }
+};
+
+const DB_CONFIG = {
+    host: "194.62.1.82",
+    user: "u55_ouNpGG5dEz",
+    password: "G!jrZk!3UqQqFZOWvej.Jitm",
+    database: "s55_simo"
 };
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
+
     const { username, code } = req.body;
 
-    const gift = REWARDS[code];
-    if (!gift) return res.status(400).json({ success: false, message: "الكود غير صحيح!" });
+    if (!username || !code) {
+        return res.status(400).json({ success: false, message: 'بيانات ناقصة (Username or Code missing)' });
+    }
 
+    const cleanCode = code.trim().toUpperCase();
+    const reward = REWARDS_LIST[cleanCode];
+
+    // 1. Check wach l-code s7i7
+    if (!reward) {
+        return res.status(400).json({ success: false, message: 'الكود غير صحيح أو غير موجود' });
+    }
+
+    let connection;
     try {
-        const connection = await mysql.createConnection({
-            host: "194.62.1.82",
-            user: "u55_ouNpGG5dEz",
-            password: "G!jrZk!3UqQqFZOWvej.Jitm",
-            database: "s55_simo"
-        });
+        connection = await mysql.createConnection(DB_CONFIG);
 
-        // Check wach player deja khda cadeau
-        const [rows] = await connection.execute('SELECT web_gift FROM users WHERE username = ?', [username]);
-        
-        if (rows.length > 0 && rows[0].web_gift !== 0) {
-            return res.status(400).json({ success: false, message: "لقد استلمت هدية بالفعل، ادخل للعبة!" });
+        // 2. Check wach l-code t-khdem mn qbel (f table used_codes)
+        const [usedRows] = await connection.execute(
+            'SELECT id FROM used_codes WHERE code = ?',
+            [cleanCode]
+        );
+
+        if (usedRows.length > 0) {
+            return res.status(400).json({ success: false, message: 'هاد الكود تخدم من قبل!' });
         }
 
-        // Tasjil l-ID dial l-hadiya f l-database
-        await connection.execute('UPDATE users SET web_gift = ? WHERE username = ?', [gift.id, username]);
+        // 3. Check wach l-player 3ndo deja hadiya katsnah f l-box
+        const [userRows] = await connection.execute(
+            'SELECT web_gift FROM users WHERE username = ?',
+            [username]
+        );
 
-        await connection.end();
-        res.status(200).json({ 
-            success: true, 
-            message: `مبروك! حصلت على ${gift.name}`,
-            giftName: gift.name 
+        if (userRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'المستخدم غير موجود في قاعدة البيانات' });
+        }
+
+        // Ila lqina web_gift kber mn 0, ya3ni rah baqi makhdach l-hadiya l-qdima
+        if (userRows[0].web_gift > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'عندك هدية كتسناك فـ /box! خودها هي الأولى عاد دخل كود آخر.' 
+            });
+        }
+
+        // 4. UPDATE l-hadiya l-jdida f table users
+        await connection.execute(
+            'UPDATE users SET web_gift = ? WHERE username = ?',
+            [reward.id, username]
+        );
+
+        // 5. INSERT l-code f used_codes bash may-t-3awdch
+        await connection.execute(
+            'INSERT INTO used_codes (code, username) VALUES (?, ?)',
+            [cleanCode, username]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: `مبروك! حصلت على ${reward.name}. دخل للعبة واكتب /box باش تاخدها.`
         });
+
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error(error);
+        return res.status(500).json({ success: false, message: 'خطأ في الاتصال بقاعدة البيانات', error: error.message });
+    } finally {
+        if (connection) await connection.end();
     }
 }
